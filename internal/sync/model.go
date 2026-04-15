@@ -6,36 +6,11 @@ type SyncPayload struct {
 }
 
 type ProfileSyncDTO struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Settings    ProfileSettingsSyncDTO `json:"settings"`
-	PinnedApps  []AppSyncDTO           `json:"pinnedApps"`
-	VisitedURLs []VisitedUrlSyncDTO    `json:"visitedUrls"`
-}
-
-type ProfileSettingsSyncDTO struct {
-	DefaultURL            string  `json:"defaultUrl"`
-	AnimationSpeed        float32 `json:"animationSpeed"`
-	IsSharpMode           bool    `json:"isSharpMode"`
-	CursorContainerSize   float32 `json:"cursorContainerSize"`
-	CursorPointerSize     float32 `json:"cursorPointerSize"`
-	CursorTrackingSpeed   float32 `json:"cursorTrackingSpeed"`
-	ShowSuggestions       bool    `json:"showSuggestions"`
-	ClosedTabHistorySize  float32 `json:"closedTabHistorySize"`
-	BackSquareOffsetX     float32 `json:"backSquareOffsetX"`
-	BackSquareOffsetY     float32 `json:"backSquareOffsetY"`
-	BackSquareIdleOpacity float32 `json:"backSquareIdleOpacity"`
-	SearchEngine          int     `json:"searchEngine"`
-	IsFullscreenMode      bool    `json:"isFullscreenMode"`
-	HighlightColor        int     `json:"highlightColor"`
-	IsAdBlockEnabled      bool    `json:"isAdBlockEnabled"`
-	IsGuideModeEnabled    bool    `json:"isGuideModeEnabled"`
-	IsDesktopMode         bool    `json:"isDesktopMode"`
-	IsEnabledMediaControl bool    `json:"isEnabledMediaControl"`
-	IsEnabledOutSync      bool    `json:"isEnabledOutSync"`
-	OptionsOrder          string  `json:"optionsOrder"`
-	SettingsOrder         string  `json:"settingsOrder"`
-	HiddenOptions         string  `json:"hiddenOptions"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Settings    string              `json:"settings"`
+	PinnedApps  []AppSyncDTO        `json:"pinnedApps"`
+	VisitedURLs []VisitedUrlSyncDTO `json:"visitedUrls"`
 }
 
 type AppSyncDTO struct {

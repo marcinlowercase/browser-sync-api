@@ -30,17 +30,20 @@ func generate9DigitCode() (string, error) {
 func (h *Handler) RequestCode(w http.ResponseWriter, r *http.Request) {
 	var payload RequestCodePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Printf("❌ [AUTH/REQUEST] Invalid JSON")
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("📩 [AUTH/REQUEST] Code requested for email: %s", payload.Email)
+
 	code, err := generate9DigitCode()
 	if err != nil {
+		log.Printf("❌ [AUTH/REQUEST] Failed to generate code for %s | Error: %v", payload.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Save to database (Expires in 10 minutes)
 	expiration := time.Now().Add(10 * time.Minute)
 	query := `
 		INSERT INTO otp_codes (email, code, expires_at)
@@ -49,13 +52,14 @@ func (h *Handler) RequestCode(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.DB.Exec(query, payload.Email, code, expiration)
 	if err != nil {
-		log.Printf("DB Error: %v", err)
+		log.Printf("❌ [AUTH/REQUEST] DB Error for %s | Error: %v", payload.Email, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	go sendAuthEmail(payload.Email, code)
 
+	log.Printf("✅[AUTH/REQUEST] Code generation successful for: %s", payload.Email)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AuthResponse{Message: "Code sent successfully"})
 }
@@ -64,24 +68,25 @@ func (h *Handler) RequestCode(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 	var payload VerifyCodePayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		log.Printf("❌ [AUTH/VERIFY] Invalid JSON")
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("🔐 [AUTH/VERIFY] Verification attempt for email: %s", payload.Email)
 
 	var dbCode string
 	var expiresAt time.Time
 	err := h.DB.QueryRow(`SELECT code, expires_at FROM otp_codes WHERE email = $1`, payload.Email).Scan(&dbCode, &expiresAt)
 
 	if err == sql.ErrNoRows || dbCode != payload.Code || time.Now().After(expiresAt) {
+		log.Printf("❌[AUTH/VERIFY] Invalid or expired code for: %s", payload.Email)
 		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
 		return
 	}
 
-	// Delete used code
 	h.DB.Exec(`DELETE FROM otp_codes WHERE email = $1`, payload.Email)
 
-	// Create user if not exists and get their UUID
-	// "DO UPDATE SET email=EXCLUDED.email" is a Postgres trick to force RETURNING id even if the row already exists
 	var userID string
 	err = h.DB.QueryRow(`
 		INSERT INTO users (email) VALUES ($1)
@@ -89,18 +94,19 @@ func (h *Handler) VerifyCode(w http.ResponseWriter, r *http.Request) {
 		RETURNING id;`, payload.Email).Scan(&userID)
 
 	if err != nil {
-		log.Printf("DB Error mapping user: %v", err)
+		log.Printf("❌ [AUTH/VERIFY] DB Error creating user %s | Error: %v", payload.Email, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate JWT
 	token, err := GenerateJWT(userID, payload.Email)
 	if err != nil {
+		log.Printf("❌ [AUTH/VERIFY] Failed to generate token for %s | Error: %v", payload.Email, err)
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("✅ [AUTH/VERIFY] Login successful for email: %s (UserID: %s)", payload.Email, userID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AuthResponse{Token: token, Message: "Login successful"})
 }
@@ -112,14 +118,12 @@ func sendAuthEmail(toEmail string, code string) {
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"
 
-	// Construct the email message
 	subject := "Subject: the browser of oo1 studio login code\r\n"
 	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 	htmlBody := fmt.Sprintf(`
 		<!DOCTYPE html>
 		<html>
 		<body style="text-align: center;">
-			<!-- user-select: all is kept to help with highlighting -->
 			<div style="font-family: monospace; font-size: 16px">
 				%s
 			</div>
@@ -127,14 +131,13 @@ func sendAuthEmail(toEmail string, code string) {
 		</html>`, code)
 	message := []byte(subject + mime + htmlBody)
 
-	// Authenticate and send
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{toEmail}, message)
 
 	if err != nil {
-		log.Printf("❌ Failed to send email to %s: %v\n", toEmail, err)
+		log.Printf("❌ [EMAIL] Failed to send email to %s: %v", toEmail, err)
 		return
 	}
 
-	log.Printf("✅ Real email successfully sent to %s!\n", toEmail)
+	log.Printf("📧 [EMAIL] Real email successfully sent to %s", toEmail)
 }

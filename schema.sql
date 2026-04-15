@@ -19,28 +19,7 @@ CREATE TABLE IF NOT EXISTS sync_profiles (
 
 CREATE TABLE IF NOT EXISTS sync_profile_settings (
     profile_id UUID PRIMARY KEY REFERENCES sync_profiles(id) ON DELETE CASCADE,
-    default_url TEXT,
-    animation_speed REAL,
-    is_sharp_mode BOOLEAN,
-    cursor_container_size REAL,
-    cursor_pointer_size REAL,
-    cursor_tracking_speed REAL,
-    show_suggestions BOOLEAN,
-    closed_tab_history_size REAL,
-    back_square_offset_x REAL,
-    back_square_offset_y REAL,
-    back_square_idle_opacity REAL,
-    search_engine INT,
-    is_fullscreen_mode BOOLEAN,
-    highlight_color INT,
-    is_ad_block_enabled BOOLEAN,
-    is_guide_mode_enabled BOOLEAN,
-    is_desktop_mode BOOLEAN,
-    is_enabled_media_control BOOLEAN,
-    is_enabled_out_sync BOOLEAN,
-    options_order TEXT,
-    settings_order TEXT,
-    hidden_options TEXT
+    settings_json JSONB NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sync_pinned_apps (
