@@ -25,6 +25,15 @@ func (h *Handler) PushData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. FIX: Verify User Exists (Prevents Foreign Key 23503 Error)
+	// If Device B deleted the account, Device A's token is invalid!
+	var userExists bool
+	err := h.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, userID).Scan(&userExists)
+	if err != nil || !userExists {
+		http.Error(w, "User account no longer exists. Please log out and log in again.", http.StatusUnauthorized)
+		return
+	}
+
 	// Begin Database Transaction
 	tx, err := h.DB.Begin()
 	if err != nil {
@@ -33,15 +42,26 @@ func (h *Handler) PushData(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback() // Safely rollback if we don't call tx.Commit()
 
-	// 1. Wipe old data: Because of ON DELETE CASCADE, deleting profiles deletes apps, history, & settings!
+	// Wipe old data: Because of ON DELETE CASCADE, deleting profiles deletes apps, history, & settings!
 	_, err = tx.Exec(`DELETE FROM sync_profiles WHERE user_id = $1`, userID)
 	if err != nil {
 		http.Error(w, "Failed to clear old sync data", http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Insert new data from the payload
+	// 2. FIX: Prevent Duplicate Key Error 23505
+	// We keep track of profile IDs to ensure we don't insert the same one twice if Android sends duplicates.
+	seenProfiles := make(map[string]bool)
+
+	// Insert new data from the payload
 	for _, profile := range payload.Profiles {
+
+		// Skip if we already processed this profile ID in this payload
+		if seenProfiles[profile.ID] {
+			continue
+		}
+		seenProfiles[profile.ID] = true
+
 		var dbProfileID string
 		err = tx.QueryRow(`
 			INSERT INTO sync_profiles (user_id, client_profile_id, name)

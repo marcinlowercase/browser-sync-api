@@ -1,6 +1,6 @@
 GOOS=linux GOARCH=amd64 go build -o browser-sync-api-linux cmd/api-server/main.go
 
-scp -i /path/to/key.pem browser-sync-api-linux schema.sql .env <VPS_USERNAME@<VPS_IP>:~
+scp -i /path/to/key.pem browser-sync-api-linux schema.sql .env <VPS_USERNAME>@<VPS_IP>:~
 
 ssh -i /path/to/key.pem <VPS_USERNAME@<VPS_IP>
 
